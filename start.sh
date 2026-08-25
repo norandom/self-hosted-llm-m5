@@ -145,6 +145,10 @@ TUNING=(
 mkdir -p "$SSD_CACHE_DIR"
 [ -f "$WARM_PROMPTS" ] && TUNING+=(--warm-prompts "$WARM_PROMPTS")
 
+# Roll the log before appending to it. The launchd agent handles the daily case
+# while the server runs; this covers a machine that was asleep at 00:05.
+[ -x "$ROOT/rotate-logs.sh" ] && "$ROOT/rotate-logs.sh" >/dev/null 2>&1 || true
+
 echo "starting vllm-mlx $VLLM_MLX_VERSION on $HOST:$PORT"
 # Parser name is `gemma4`; `gemma` is not in the enum and argparse rejects it
 # before the server binds a port. Without --reasoning-parser, the model's

@@ -40,6 +40,18 @@ def _download_complete() -> bool:
 brew.packages(name="Install aria2 and uv", packages=["aria2", "uv"])
 files.directory(name="Create models directory", path=str(MODELS_DIR))
 
+# Daily log rotation. The agent is a launchd user job, so no root involved.
+# Installing is idempotent: --install boots out any existing copy first.
+rotate_plist = Path.home() / "Library/LaunchAgents/com.local-llm-stack.logrotate.plist"
+if host.get_fact(File, path=str(rotate_plist)):
+    logger.info("log rotation: agent installed")
+else:
+    server.shell(
+        name="Install daily log rotation agent",
+        commands=["./rotate-logs.sh --install"],
+        _chdir=str(ROOT),
+    )
+
 # markitdown-mcp is the one MCP server this setup keeps on: it converts PDFs,
 # Office files and HTML to markdown, which is how specs usually arrive. Installed
 # as a uv tool rather than left to uvx so the first request does not pay for a
@@ -108,6 +120,10 @@ oc_text = oc_config.read_text() if host.get_fact(File, path=str(oc_config)) else
 
 logger.info("--- enabled feature set ---")
 logger.info("flash attention : built-in (mx.fast.scaled_dot_product_attention)")
+logger.info(
+    "log rotation    : "
+    + ("daily via launchd" if host.get_fact(File, path=str(rotate_plist)) else "NOT installed")
+)
 
 markitdown = "markitdown" in (host.get_fact(Command, command="uv tool list") or "")
 logger.info(

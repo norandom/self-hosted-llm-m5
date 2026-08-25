@@ -204,6 +204,14 @@ swap models, check that line first.
 Keep total resident weights under about 40 GB. Past that this machine swaps and
 generation drops below 1 tok/s.
 
+The server log grows without bound on its own. `rotate-logs.sh --install` sets up
+a launchd agent that rotates it daily at 00:05, gzips the result into `logs/` and
+keeps 14 days; the deploy does this for you. `start.sh` also rotates on startup,
+which covers a machine that was asleep at 00:05. Rotation copies and then
+truncates rather than renaming, because the server holds the file open, so a
+rename would leave it writing to the moved inode. The tradeoff is a narrow window
+where one line can be lost.
+
 Shell scripts here target bash 3.2, since that is what macOS ships. No
 associative arrays, and `set -u` treats an empty array expansion as an error.
 
@@ -271,7 +279,8 @@ model.
 | `apply-patch.sh`, `patches/` | pinned venv plus the tool-parser repair |
 | `models.yaml` | vllm-mlx registry, hand-owned; the deploy checks it but never rewrites it |
 | `start.sh`, `stop.sh` | server lifecycle, tuning, pre-warm selection, readiness poll |
-| `bench.sh` | TTFT and tok/s at three prompt sizes |
+| `bench.sh` | bandwidth, then TTFT and tok/s at three prompt sizes |
+| `rotate-logs.sh` | daily log rotation, plus the launchd agent that triggers it |
 | `warm-prompts/` | one preamble per pre-warming category |
 | `opencode.json`, `.opencode/` | provider, plugins, MCP state, context-pruning config |
 

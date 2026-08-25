@@ -16,3 +16,6 @@ server.log
 # Python
 __pycache__/
 *.py[cod]
+
+# Rotated logs
+logs/
