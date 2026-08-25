@@ -29,6 +29,23 @@ RESTORE_WIRED=1 ./stop.sh   # also restore the default Metal memory ceiling
 `start.sh` needs sudo to raise `iogpu.wired_limit_mb`; that is why it is outside
 pyinfra. The setting resets on reboot.
 
+On launch it asks which kind of work to pre-warm the prefix cache for:
+
+```
+  1) Information security and compliance
+  2) Software programming — Python, JavaScript or Rust
+  3) Quantitative finance analysis and factor research
+  4) None — skip pre-warming
+```
+
+Non-interactively, pass `WARM_CATEGORY=infosec|programming|quant|none`; with no
+stdin to prompt on (pyinfra, cron) it skips warming rather than blocking.
+
+> **Pre-warming only pays off if the warmed text shares a literal prefix with
+> what the client later sends.** The files in `warm-prompts/` are therefore meant
+> to hold the *actual* system preamble you use for that domain — edit them to
+> match yours. A merely topical prompt warms nothing.
+
 ## Layout
 
 | Path | Role |
@@ -37,7 +54,8 @@ pyinfra. The setting resets on reboot.
 | `download.sh` | aria2c `-j4 -x16 -s16`; skips byte-exact files, resumes partials |
 | `apply-patch.sh` / `patches/` | pinned venv + Gemma 4 tool-parser repair |
 | `models.yaml` | vllm-mlx registry. Hand-owned — the deploy validates, never rewrites |
-| `start.sh` / `stop.sh` | server lifecycle, PID file, readiness poll |
+| `start.sh` / `stop.sh` | server lifecycle, tuning flags, pre-warm prompt, readiness poll |
+| `warm-prompts/` | one preamble file per pre-warming category |
 | `opencode.json` / `.opencode/` | provider, plugins, MCP state, DCP config |
 
 ## Configuration that matters
