@@ -1,0 +1,18 @@
+# Model weights — 28 GB, fetched by download.sh
+models/
+
+# Patched runtime venv, rebuilt by apply-patch.sh
+.venv/
+
+# Runtime state
+server.log
+.server.pid
+.aria2/
+.kvcache/
+
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]

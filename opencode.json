@@ -1,0 +1,27 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "provider": {
+    "local": {
+      "npm": "@ai-sdk/openai-compatible",
+      "name": "vllm-mlx (local)",
+      "options": {
+        "baseURL": "http://127.0.0.1:8000/v1",
+        "apiKey": "local"
+      },
+      "models": {
+        "reasoner": { "name": "Gemma 4 26B-A4B (8bit)" }
+      }
+    }
+  },
+  "model": "local/reasoner",
+  "small_model": "local/reasoner",
+  "plugin": [
+    "@tarquinen/opencode-dcp",
+    "@dietrichgebert/ponytail"
+  ],
+  "mcp": {
+    "markitdown": { "enabled": true },
+    "zscaler": { "enabled": false },
+    "playwright": { "enabled": false }
+  }
+}

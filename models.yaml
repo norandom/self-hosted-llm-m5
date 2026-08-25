@@ -1,0 +1,22 @@
+# vllm-mlx registry.
+#
+# Budget: 28 GB of weights on a 64 GB machine. Keep total resident weights well
+# under ~40 GB — that is where this machine starts swapping, and swapping drops
+# generation to well under 1 tok/s.
+manager:
+  memory_budget_gb: 34
+  idle_unload_seconds: 0
+
+models:
+  # 25.2B total, 3.8B active per token. Sparse activation is what makes this
+  # fast at 219 GB/s of memory bandwidth.
+  #
+  # continuous_batching must stay true: clients issue overlapping requests
+  # (main turn plus title generation), and with it off the engine rejects the
+  # overlap with "SimpleEngine serialized route is busy", which surfaces as an
+  # empty response rather than an error.
+  - name: reasoner
+    path: ./models/gemma-4-26b-a4b-it-8bit
+    preload: true
+    continuous_batching: true
+    estimated_memory_gb: 30

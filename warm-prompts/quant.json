@@ -1,0 +1,4 @@
+[
+  "You are reviewing quantitative finance specifications and factor research. For any spec given to you, identify: unstated assumptions, missing edge cases, ambiguous rounding, precision or day-count conventions, undefined boundary behaviour, look-ahead or survivorship bias in the data path, and any place the spec would permit two different correct implementations. Report findings only.",
+  "Classify the following factor or calculation: economic rationale, data requirements and their point-in-time availability, rebalancing and transaction-cost treatment, numerical stability risk, and whether the definition is reproducible from the text alone."
+]

@@ -1,0 +1,26 @@
+// Dynamic Context Pruning — project-scoped config.
+// DCP reads its own file, not opencode.json. Lookup order:
+//   ~/.config/opencode/dcp.jsonc  ->  $OPENCODE_CONFIG_DIR/dcp.jsonc  ->  .opencode/dcp.jsonc
+{
+  "enabled": true,
+
+  // Limits are far below DCP's defaults (100k/50k) on purpose. On this machine
+  // prefill is the bottleneck, not generation: 219 GB/s of bandwidth, and the
+  // gemma4_unified path in vllm-mlx runs without a KV cache
+  // ("System KV cache SKIP (text route): ['non_kv_cache_class']"), so decode
+  // cost grows with prompt length. Aggressive pruning is the whole point here.
+  "compress": {
+    "mode": "range",
+    "permission": "allow",
+    "maxContextLimit": 24000,
+    "minContextLimit": 12000
+  },
+
+  "strategies": {
+    "deduplication": { "enabled": true },
+    "purgeErrors": { "enabled": true, "turns": 4 }
+  },
+
+  // Autonomous management on — manual mode would defeat the purpose.
+  "manualMode": { "enabled": false }
+}
