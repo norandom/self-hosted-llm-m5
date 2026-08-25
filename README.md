@@ -1,4 +1,4 @@
-# local-llm-stack
+# local-llm-stack for M5 MacBook Pro (personal use)
 
 Runs a local reasoning model on an Apple Silicon Mac and serves it to opencode.
 The model reviews specifications, quantitative maths and code. It is not a coding
