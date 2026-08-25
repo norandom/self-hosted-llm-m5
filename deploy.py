@@ -2,7 +2,7 @@
 
     uvx --from pyinfra pyinfra inventory.py deploy.py -y
 
-Re-running is a no-op once everything is in place. Setup only — starting the
+Re-running is a no-op once everything is in place. Setup only. Starting the
 server lives in start.sh, which needs sudo for the Metal memory ceiling, so this
 never requires elevated privileges.
 """
@@ -68,7 +68,7 @@ else:
         _chdir=str(ROOT),
     )
 
-# models.yaml is hand-owned — the tuning surface. Validate its paths rather than
+# models.yaml is hand-owned, being the tuning surface. Validate its paths rather than
 # rewriting it; a bad path otherwise surfaces as an opaque server error.
 registry = ROOT / "models.yaml"
 if not host.get_fact(File, path=str(registry)):
@@ -80,7 +80,7 @@ else:
             continue
         raw = stripped.split("path:", 1)[1].strip()
         target = (ROOT / raw).resolve() if raw.startswith(".") else Path(raw)
-        # Check for weights, not just the directory — an empty directory would
+        # Check for weights, not just the directory. An empty directory would
         # otherwise report ok and the failure would surface at server start.
         if not host.get_fact(Directory, path=str(target)):
             logger.error(f"registry path MISSING: {raw}")
@@ -122,7 +122,7 @@ for pkg, label in (
 if host.get_fact(File, path=str(dcp_config)):
     logger.info("dcp config      : .opencode/dcp.jsonc (maxContext 24000)")
 else:
-    logger.warning("dcp config      : missing — DCP falls back to 100k defaults")
+    logger.warning("dcp config      : missing, DCP falls back to 100k defaults")
 
 logger.info(
     "NOTE: opencode resolves plugins from the directory it runs in. Run it here, "

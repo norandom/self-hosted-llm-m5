@@ -1,7 +1,7 @@
 # vllm-mlx registry.
 #
 # Budget: 28 GB of weights on a 64 GB machine. Keep total resident weights well
-# under ~40 GB — that is where this machine starts swapping, and swapping drops
+# under ~40 GB. That is where this machine starts swapping, and swapping drops
 # generation to well under 1 tok/s.
 manager:
   memory_budget_gb: 34

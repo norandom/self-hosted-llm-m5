@@ -1,103 +1,210 @@
 # local-llm-stack
 
-A local reasoning model for quant workflow design — judging specs, quantitative
-math, and Python — served by `vllm-mlx` over an OpenAI-compatible endpoint.
+Runs a local reasoning model on an Apple Silicon Mac and serves it to opencode.
+The model reviews specifications, quantitative maths and code. It is not a coding
+agent and it is not tuned to emit code.
 
-**Model:** `mlx-community/gemma-4-26b-a4b-it-8bit`, 28 GB, served as `reasoner`.
-A general instruction model, deliberately not code-tuned: the job is deciding
-whether a spec is any good, not transcribing it. 25.2B total with 3.8B active per
-token, GPQA 79.2, 260k context.
+Before anything else: whether this is usable on your machine is decided by memory
+bandwidth, not by disk space or core count. Check the requirements first. You can
+otherwise spend an afternoon and 28 GB of download discovering that your Mac
+generates four tokens a second.
 
-## Setup
+## Requirements
+
+| | Minimum | This was built and measured on |
+|---|---|---|
+| Chip | Apple Silicon, M-series Pro or better | Apple M5 Pro, 20 GPU cores |
+| Memory | 48 GB unified | 64 GB |
+| Free disk | 35 GB | |
+| macOS | 15 or newer, Metal 4 | 25.6 |
+| Tools | `uv`, `aria2` (the deploy installs both via Homebrew) | |
+
+Memory bandwidth is what sets your speed. Token generation reads weights from
+memory, so the ceiling for a dense model is roughly `bandwidth / model_size`
+tokens per second. This machine measures 219 GB/s, which would cap a dense 28 GB
+model near 8 tok/s. The model here is sparse, 3.8B parameters active out of
+25.2B, so it reads a fraction of its weight file per token and runs far faster
+than its size suggests. Measure your own bandwidth before assuming these numbers
+transfer:
+
+```sh
+uvx --from mlx-lm --with mlx python -c "
+import mlx.core as mx, time
+a = mx.zeros((134217728,), dtype=mx.bfloat16); mx.eval(a)
+for _ in range(3): mx.eval(a * 1.0001)
+t = time.perf_counter()
+for _ in range(20): mx.eval(a * 1.0001)
+el = time.perf_counter() - t
+print(f'{20 * a.nbytes * 2 / el / 1e9:.0f} GB/s')"
+```
+
+Below roughly 150 GB/s I would not bother, and a base M-series chip sits in that
+range. I spent a day getting this working on the assumption I had Max-class
+bandwidth. I did not. Measure first.
+
+## What it runs
+
+`mlx-community/gemma-4-26b-a4b-it-8bit`, 28 GB on disk, served as `reasoner`.
+This is Google's general instruction model, not a code model. That is deliberate.
+A model trained to produce code will happily turn a bad specification into bad
+code. The job here is deciding whether the specification holds up, so the model
+needs judgement over the domain rather than fluency in Python.
+
+It scores 79.2 on GPQA and takes 260k tokens of context, which matters when the
+thing you are reviewing is long.
+
+A fair objection: why not use a frontier model through an API? Because these
+specs contain material that should not leave machines you control. If that
+constraint does not apply to you, use a bigger model. Nothing local at this size
+will match GLM 5.2 or Opus at judging a specification, and pretending otherwise
+would waste your time.
+
+## Quick start
 
 ```sh
 uvx --from pyinfra pyinfra inventory.py deploy.py -y
+./start.sh
 ```
 
-Idempotent; `--dry` shows what it would do. Installs `aria2`/`uv`, downloads
-weights, builds the patched runtime venv, validates `models.yaml`, and reports
-the enabled feature set. Already MLX-native, so there is no conversion step.
+The deploy is idempotent, so re-running it is safe and cheap. Add `--dry` to see
+what it would do without doing it. It installs `aria2` and `uv`, downloads the
+weights, builds a patched runtime venv, checks that the paths in `models.yaml`
+resolve, and prints what ended up enabled.
 
-## Run
-
-```sh
-./start.sh                  # blocks until /v1/models answers, then backgrounds
-./stop.sh
-RESTORE_WIRED=1 ./stop.sh   # also restore the default Metal memory ceiling
-```
-
-`start.sh` needs sudo to raise `iogpu.wired_limit_mb`; that is why it is outside
-pyinfra. The setting resets on reboot.
-
-On launch it asks which kind of work to pre-warm the prefix cache for:
+`start.sh` asks what kind of work to pre-warm the cache for:
 
 ```
   1) Information security and compliance
-  2) Software programming — Python, JavaScript or Rust
+  2) Software programming, Python, JavaScript or Rust
   3) Quantitative finance analysis and factor research
-  4) None — skip pre-warming
+  4) None
 ```
 
-Non-interactively, pass `WARM_CATEGORY=infosec|programming|quant|none`; with no
-stdin to prompt on (pyinfra, cron) it skips warming rather than blocking.
+Pass `WARM_CATEGORY=infosec|programming|quant|none` to skip the question. With no
+terminal to ask on, it skips warming rather than hanging.
 
-> **Pre-warming only pays off if the warmed text shares a literal prefix with
-> what the client later sends.** The files in `warm-prompts/` are therefore meant
-> to hold the *actual* system preamble you use for that domain — edit them to
-> match yours. A merely topical prompt warms nothing.
+Pre-warming only helps if the warmed text shares a literal prefix with what your
+client later sends. The files in `warm-prompts/` should hold the actual system
+preamble you use for that domain, so edit them to match yours. A prompt that is
+merely on-topic warms nothing.
+
+`start.sh` also raises `iogpu.wired_limit_mb` with sudo, which is why it sits
+outside pyinfra. The setting goes back to default on reboot.
+
+Point opencode at it by copying `opencode.json` into whatever project you are
+working in, or merge it into `~/.config/opencode/opencode.json`.
+
+## Measuring it
+
+```sh
+./bench.sh              # three prompt sizes against the API
+./bench.sh --agent      # adds one round trip through opencode
+MAX_TOKENS=256 ./bench.sh
+```
+
+On the reference machine:
+
+```
+prompt        TTFT     total  tokens    tok/s
+----------------------------------------------
+short        0.59s     1.79s      61     50.9
+medium       1.85s     3.15s      61     46.9
+long         5.79s     7.21s      61     42.8
+```
+
+Time to first token grows with prompt length because that is prefill, and prefill
+is compute. Tokens per second should stay roughly flat. If your tok/s collapses as
+the prompt grows, the KV cache is not being reused. Chase that before anything
+else; it is usually worth more than any flag in this repo.
+
+`--agent` measures wall clock through opencode. It will be slower than the rows
+above, because the harness adds its own system prompt and tool definitions to
+every turn. The size of that gap is the useful number, and `grep '\[REQUEST\]'
+server.log` shows you what caused it.
+
+Note that `opencode -p` is `--password`, not print. The scriptable flag is
+`--format json`.
+
+## Configuration
+
+Turn MCP servers off for local use. Nothing else here comes close to mattering
+this much, and I found it by accident. A global opencode config with `markitdown`, `zscaler` and
+`playwright` enabled contributed 253 tool definitions and a 72,746 token prompt
+on every turn. A cloud model absorbs that. Locally it means nothing generates
+until that prefill finishes. `opencode.json` here leaves only `markitdown` on.
+After changing MCP config, check `[REQUEST] ... tools=N` in the server log.
+
+Use `response_format` with a JSON schema for classification instead of tool
+calls. Constrained output keeps the tool-call template out of the path, which is
+both more reliable and a better fit for classification anyway.
+
+`continuous_batching: true` in `models.yaml` is not optional. Clients issue
+overlapping requests, one for the turn and one for things like title generation.
+With batching off, the engine refuses the overlap with `SimpleEngine serialized
+route is busy`, and opencode shows that as an empty reply rather than an error.
+
+The tuning flags in `start.sh` are each commented with a reason. The ones that
+mattered:
+
+`--cache-memory-mb` bounds a prefix cache that the server otherwise reports as
+"none configured" and auto-sizes to about 20% of RAM. On a 64 GB machine that
+lands close to the point where it starts swapping. `--kv-cache-quantization` at 8
+bits halves a KV cache that is roughly 240 KB per token here, given 8 KV heads,
+256 head dimensions and 30 layers. `--chunked-prefill-tokens` stops a long
+prefill from starving a request already in flight, which showed up in the logs as
+occasional sub-1 tok/s replies. `--default-thinking-token-budget` caps reasoning,
+and without it a reasoning model will spend thousands of tokens deliberating
+about a yes or no answer.
+
+Four flags are deliberately off, with reasons in the script: `--enable-mtp` (this
+model has no MTP heads, so it does nothing), `--max-kv-size` (switches to a
+rotating cache that silently drops early context), `--specprefill` (approximates
+prefill, which is wrong when the prompt is the thing under review) and
+`--use-paged-cache` (still marked experimental).
+
+## Known problems
+
+The tool-call parser needs a patch, and the server has to run from `.venv`.
+vllm-mlx expects Gemma to delimit string arguments with a `<|"|>` token. The
+model sometimes emits plain quotes instead, and when such a value contains an
+unescaped inner quote, the parser returns no tool call at all and the client
+waits forever. That is what a hung file write looks like. Upstream `main` at
+4b654c0 behaves the same way, so there is nothing to upgrade to.
+`apply-patch.sh` builds a pinned venv and adds a repair path that only runs after
+the strict path has already failed, so it cannot break input that already worked.
+`start.sh` warns if `.venv` is missing. Undo with `rm -rf .venv`.
+
+The parser name is `gemma4`, not `gemma`. Argparse rejects the wrong one before
+the server binds a port, which presents as "cannot connect to API".
+
+This model loads through vllm-mlx's multimodal path, because it carries vision
+and audio configs. That is fine here, and the log line to confirm it is
+`MLLMBatchGenerator: KV prefix cache enabled`. A related model, Gemma 4 12B with
+`model_type: gemma4_unified`, instead logs `System KV cache SKIP (text route)`
+and runs without a KV cache, which makes it unusable for long prompts. If you
+swap models, check that line first.
+
+Keep total resident weights under about 40 GB. Past that this machine swaps and
+generation drops below 1 tok/s.
+
+Shell scripts here target bash 3.2, since that is what macOS ships. No
+associative arrays, and `set -u` treats an empty array expansion as an error.
 
 ## Layout
 
 | Path | Role |
 |---|---|
-| `deploy.py` / `inventory.py` | pyinfra setup, `@local` connector, no SSH |
-| `download.sh` | aria2c `-j4 -x16 -s16`; skips byte-exact files, resumes partials |
-| `apply-patch.sh` / `patches/` | pinned venv + Gemma 4 tool-parser repair |
-| `models.yaml` | vllm-mlx registry. Hand-owned — the deploy validates, never rewrites |
-| `start.sh` / `stop.sh` | server lifecycle, tuning flags, pre-warm prompt, readiness poll |
-| `warm-prompts/` | one preamble file per pre-warming category |
-| `opencode.json` / `.opencode/` | provider, plugins, MCP state, DCP config |
+| `deploy.py`, `inventory.py` | pyinfra setup over the `@local` connector, no SSH |
+| `download.sh` | aria2c with 16 connections per file, skips byte-exact files, resumes partials |
+| `apply-patch.sh`, `patches/` | pinned venv plus the tool-parser repair |
+| `models.yaml` | vllm-mlx registry, hand-owned; the deploy checks it but never rewrites it |
+| `start.sh`, `stop.sh` | server lifecycle, tuning, pre-warm selection, readiness poll |
+| `bench.sh` | TTFT and tok/s at three prompt sizes |
+| `warm-prompts/` | one preamble per pre-warming category |
+| `opencode.json`, `.opencode/` | provider, plugins, MCP state, context-pruning config |
 
-## Configuration that matters
+## Licence
 
-**Use `response_format` with a JSON schema for classification, not tool calls.**
-Constrained JSON output keeps the tool-call template out of the path entirely,
-which is both more reliable and the right interface for classification work.
-
-**MCP servers stay mostly off.** The global `~/.config/opencode/opencode.jsonc`
-enables `markitdown`, `zscaler` and `playwright`; together those contributed 253
-tool definitions and a 72,746-token prompt per turn. Only `markitdown` is on
-here. After any MCP change, check the server's `[REQUEST] ... tools=N` line.
-
-**`continuous_batching: true` is required**, or overlapping requests are rejected
-with `SimpleEngine serialized route is busy` and surface as empty responses.
-
-**Parser name is `gemma4`, not `gemma`** — argparse rejects the latter before the
-server binds a port, which looks like "cannot connect to API".
-
-**The server must run from `.venv`.** `apply-patch.sh` adds a repair path for a
-vllm-mlx bug where plain-quoted tool arguments containing unescaped inner quotes
-cause the parser to drop the tool call silently, hanging the client. Upstream
-`main` (4b654c0) behaves the same. `start.sh` warns if `.venv` is missing.
-Revert with `rm -rf .venv`.
-
-**Scripts stay bash 3.2 compatible** — macOS `/bin/bash` has no associative
-arrays, and `set -u` errors on expanding an empty array.
-
-## Performance ceiling
-
-Measured on this machine:
-
-```
-Apple M5 Pro, 20 GPU cores, Metal 4
-achieved memory bandwidth : 219 GB/s
-```
-
-Generation is bandwidth-bound: a dense model's ceiling is `219 / size_in_GB`
-tok/s. This model is sparse — 3.8B of 25.2B active — so it reads a fraction of
-its 28 GB per token and is far faster than a dense model of the same file size.
-That is the property to preserve in any future model choice; a dense 24 GB model
-caps near 9 tok/s here.
-
-Keep total resident weights under ~40 GB. Above that this machine swaps, and
-generation drops below 1 tok/s.
+No licence chosen yet for the scripts, so add one before publishing. The weights
+are separate in any case: Gemma 4 comes under Google's Gemma Terms of Use, which
+you accept when you download it.

@@ -1,4 +1,4 @@
-// Dynamic Context Pruning — project-scoped config.
+// Dynamic Context Pruning, project-scoped config.
 // DCP reads its own file, not opencode.json. Lookup order:
 //   ~/.config/opencode/dcp.jsonc  ->  $OPENCODE_CONFIG_DIR/dcp.jsonc  ->  .opencode/dcp.jsonc
 {
@@ -21,6 +21,6 @@
     "purgeErrors": { "enabled": true, "turns": 4 }
   },
 
-  // Autonomous management on — manual mode would defeat the purpose.
+  // Autonomous management on. Manual mode would defeat the purpose.
   "manualMode": { "enabled": false }
 }

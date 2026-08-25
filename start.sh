@@ -54,7 +54,7 @@ fi
 #                    spec preamble stays warm. Cheap on this machine's SSD.
 # MAX_NUM_SEQS       Single user; the default of 16 reserves concurrency
 #                    headroom that is never used.
-# --offline          Everything is local — avoids the corporate TLS proxy
+# --offline          Everything is local, so this keeps the corporate TLS proxy
 #                    entering the picture at all.
 #
 # Deliberately NOT set:
@@ -77,7 +77,7 @@ SSD_CACHE_MAX_GB="${SSD_CACHE_MAX_GB:-20}"
 #
 # IMPORTANT: prefix caching only helps to the extent that a warmed prompt shares
 # a literal prefix with what the client later sends. These files are therefore
-# meant to hold the *actual* system preamble you use for that domain — edit them
+# meant to hold the *actual* system preamble you use for that domain. Edit them
 # to match. A merely topical prompt warms nothing.
 #
 # Pick non-interactively with WARM_CATEGORY=infosec|programming|quant|none.
@@ -99,9 +99,9 @@ elif [ -t 0 ]; then
   echo
   echo "Pre-warm the prefix cache for which kind of work?"
   echo "  1) Information security and compliance"
-  echo "  2) Software programming — Python, JavaScript or Rust"
+  echo "  2) Software programming, Python, JavaScript or Rust"
   echo "  3) Quantitative finance analysis and factor research"
-  echo "  4) None — skip pre-warming"
+  echo "  4) None, skip pre-warming"
   CHOICE=""
   while [ -z "$(warm_file_for "$CHOICE")" ]; do
     printf 'Select [1-4]: '
@@ -124,7 +124,7 @@ if [ "$WARM_PROMPTS" = "none" ]; then
   echo "pre-warming: disabled"
   WARM_PROMPTS=""
 elif [ ! -f "$WARM_PROMPTS" ]; then
-  echo "WARNING: $WARM_PROMPTS not found — starting without pre-warming"
+  echo "WARNING: $WARM_PROMPTS not found. Starting without pre-warming."
   WARM_PROMPTS=""
 else
   echo "pre-warming: $(basename "$WARM_PROMPTS")"
@@ -156,7 +156,7 @@ if [ -x "$ROOT/.venv/bin/vllm-mlx" ]; then
   echo "using patched venv: $ROOT/.venv"
 else
   SERVE=(uvx --from "vllm-mlx==${VLLM_MLX_VERSION}" vllm-mlx)
-  echo "WARNING: .venv missing — running UNPATCHED via uvx; file writes may hang."
+  echo "WARNING: .venv missing, running UNPATCHED via uvx. File writes may hang."
   echo "         run ./apply-patch.sh (or the pyinfra deploy) to fix."
 fi
 

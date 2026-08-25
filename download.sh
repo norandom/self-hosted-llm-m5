@@ -8,7 +8,7 @@
 #   ./download.sh --verify        # check only, download nothing
 #
 # Model: mlx-community/gemma-4-26b-a4b-it-8bit (28.0 GB)
-#   General instruction model, deliberately NOT code-tuned — the job is judging
+#   General instruction model, deliberately NOT code-tuned. The job is judging
 #   specs, not emitting code. 25.2B total but only 3.8B active per token, so it
 #   is fast on this machine's 219 GB/s, and it takes 260k context for long specs.
 #   Already MLX-native: no conversion pass needed.

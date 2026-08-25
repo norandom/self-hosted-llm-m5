@@ -6,7 +6,7 @@
 # WHY A VENV: uvx builds a throwaway environment per invocation, so a patched
 # file would not survive. This creates one persistent env that start.sh uses.
 #
-# WHY THE PATCH: see patches/gemma4_lenient_args.py. Short version — the model
+# WHY THE PATCH: see patches/gemma4_lenient_args.py. Short version: the model
 # intermittently emits plain "-quoted tool arguments instead of Gemma's <|"|>
 # template form, the strict parser then drops the tool call entirely, and
 # opencode waits forever for a call that never arrives. Upstream main has the

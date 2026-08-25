@@ -71,7 +71,7 @@ def _patch_decode_value(raw: str):
 
     Order matters: decode as-is first (values that were already correctly
     escaped), then retry with bare inner quotes escaped. Only if both fail do we
-    fall back to the literal text — and that last case is the one that would
+    fall back to the literal text, and that last case is the one that would
     turn \\n into a literal backslash-n, so it is deliberately last.
     """
     for candidate in (raw, _patch_escape_bare_quotes(raw)):
