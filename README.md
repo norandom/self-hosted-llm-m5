@@ -224,6 +224,6 @@ associative arrays, and `set -u` treats an empty array expansion as an error.
 
 ## Licence
 
-No licence chosen yet for the scripts, so add one before publishing. The weights
-are separate in any case: Gemma 4 comes under Google's Gemma Terms of Use, which
-you accept when you download it.
+The scripts in this repository are MIT, see `LICENSE`. The model weights are
+separate and not covered by it: Gemma 4 comes under Google's Gemma Terms of Use,
+which you accept when you download it.
