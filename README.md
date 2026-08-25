@@ -17,7 +17,7 @@ generates four tokens a second.
 | Memory | 48 GB unified | 64 GB |
 | Free disk | 35 GB | |
 | macOS | 15 or newer, Metal 4 | 25.6 |
-| Tools | `uv`, `aria2` (the deploy installs both via Homebrew) | |
+| Tools | `uv`, `aria2`, `markitdown-mcp` (the deploy installs all three) | |
 
 Memory bandwidth is what sets your speed. Token generation reads weights from
 memory, so the ceiling for a dense model is roughly `bandwidth / model_size`
@@ -67,9 +67,14 @@ uvx --from pyinfra pyinfra inventory.py deploy.py -y
 ```
 
 The deploy is idempotent, so re-running it is safe and cheap. Add `--dry` to see
-what it would do without doing it. It installs `aria2` and `uv`, downloads the
-weights, builds a patched runtime venv, checks that the paths in `models.yaml`
-resolve, and prints what ended up enabled.
+what it would do without doing it. It installs `aria2` and `uv`, installs
+`markitdown-mcp` as a uv tool, downloads the weights, builds a patched runtime
+venv, checks that the paths in `models.yaml` resolve, and prints what ended up
+enabled.
+
+`markitdown-mcp` is installed as a tool rather than left to `uvx` so the first
+request does not pay for a dependency resolve, and so it still works with the
+server in `--offline` mode.
 
 `start.sh` asks what kind of work to pre-warm the cache for:
 
@@ -128,11 +133,13 @@ Note that `opencode -p` is `--password`, not print. The scriptable flag is
 ## Configuration
 
 Turn MCP servers off for local use. Nothing else here comes close to mattering
-this much, and I found it by accident. A global opencode config with `markitdown`, `zscaler` and
-`playwright` enabled contributed 253 tool definitions and a 72,746 token prompt
-on every turn. A cloud model absorbs that. Locally it means nothing generates
-until that prefill finishes. `opencode.json` here leaves only `markitdown` on.
-After changing MCP config, check `[REQUEST] ... tools=N` in the server log.
+this much, and I found it by accident. Three MCP servers left enabled in a global
+opencode config contributed 253 tool definitions and a 72,746 token prompt on
+every turn. A cloud model absorbs that. Locally it means nothing generates until
+that prefill finishes. `opencode.json` here keeps only `markitdown`, which earns
+its place by turning PDFs and Office files into markdown, since that is how specs
+tend to arrive. Audit your own global config, then check `[REQUEST] ... tools=N`
+in the server log after any MCP change.
 
 Use `response_format` with a JSON schema for classification instead of tool
 calls. Constrained output keeps the tool-call template out of the path, which is

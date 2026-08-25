@@ -11,6 +11,7 @@ from pathlib import Path
 
 from pyinfra import host, logger
 from pyinfra.facts.files import Directory, File
+from pyinfra.facts.server import Command
 from pyinfra.operations import brew, files, server
 
 ROOT = Path(__file__).parent.resolve()
@@ -38,6 +39,16 @@ def _download_complete() -> bool:
 
 brew.packages(name="Install aria2 and uv", packages=["aria2", "uv"])
 files.directory(name="Create models directory", path=str(MODELS_DIR))
+
+# markitdown-mcp is the one MCP server this setup keeps on: it converts PDFs,
+# Office files and HTML to markdown, which is how specs usually arrive. Installed
+# as a uv tool rather than left to uvx so the first request does not pay for a
+# resolve, and so it works with --offline.
+server.shell(
+    name="Install markitdown-mcp",
+    commands=["uv tool install --quiet markitdown-mcp || uv tool upgrade --quiet markitdown-mcp"],
+    _chdir=str(ROOT),
+)
 
 if _download_complete():
     logger.info("weights: present and byte-exact")
@@ -97,12 +108,17 @@ oc_text = oc_config.read_text() if host.get_fact(File, path=str(oc_config)) else
 
 logger.info("--- enabled feature set ---")
 logger.info("flash attention : built-in (mx.fast.scaled_dot_product_attention)")
+
+markitdown = "markitdown" in (host.get_fact(Command, command="uv tool list") or "")
+logger.info(
+    "markitdown-mcp  : " + ("installed" if markitdown else "NOT installed")
+)
 logger.info(
     "tool parser     : gemma4"
     + (" + lenient-args repair" if patched else " (UNPATCHED)")
 )
 
-for name, want in (("markitdown", True), ("zscaler", False), ("playwright", False)):
+for name, want in (("markitdown", True), ("playwright", False)):
     if f'"{name}"' not in oc_text:
         logger.warning(f"mcp {name:<11}: absent from opencode.json")
         continue

@@ -20,8 +20,11 @@
     "@dietrichgebert/ponytail"
   ],
   "mcp": {
-    "markitdown": { "enabled": true },
-    "zscaler": { "enabled": false },
+    "markitdown": {
+      "type": "local",
+      "enabled": true,
+      "command": ["uvx", "markitdown-mcp"]
+    },
     "playwright": { "enabled": false }
   }
 }
