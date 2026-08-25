@@ -65,11 +65,9 @@ needs judgement over the domain rather than fluency in Python.
 It scores 79.2 on GPQA and takes 260k tokens of context, which matters when the
 thing you are reviewing is long.
 
-A fair objection: why not use a frontier model through an API? Because these
-specs contain material that should not leave machines you control. If that
-constraint does not apply to you, use a bigger model. Nothing local at this size
-will match GLM 5.2 or Opus at judging a specification, and pretending otherwise
-would waste your time.
+Use case: why not use a frontier model through an API? Because it's a) more expensive , b) some specs are proprietary, c) because we can
+
+Nothing on a small Mac will will match big open-weight models like GLM 5.2 or even frontier-level models like Opus at judging a specification.
 
 ## Quick start
 
@@ -78,7 +76,7 @@ uvx --from pyinfra pyinfra inventory.py deploy.py -y
 ./start.sh
 ```
 
-The deploy is idempotent, so re-running it is safe and cheap. Add `--dry` to see
+The deployment is idempotent, so re-running it is safe and cheap. Add `--dry` to see
 what it would do without doing it. It installs `aria2` and `uv`, installs
 `markitdown-mcp` as a uv tool, downloads the weights, builds a patched runtime
 venv, checks that the paths in `models.yaml` resolve, and prints what ended up
