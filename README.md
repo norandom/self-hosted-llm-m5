@@ -207,6 +207,61 @@ generation drops below 1 tok/s.
 Shell scripts here target bash 3.2, since that is what macOS ships. No
 associative arrays, and `set -u` treats an empty array expansion as an error.
 
+## FAQ
+
+**The model ships `vision_config` and `audio_config`. Can I strip those to save
+memory?**
+
+You can, but there is almost nothing to win. Measured against the actual
+safetensors headers in the 8-bit checkpoint:
+
+```
+component                              size   share  tensors
+language model                      26.81 GB   95.9%     1339
+vision tower                         1.14 GB    4.1%      358
+total                               27.95 GB
+```
+
+There are no audio tensors at all. `audio_config` is present in `config.json`,
+but this conversion carries zero audio weights, so that half of the question is
+moot.
+
+That leaves a 1.14 GB vision tower, and dropping it would buy memory rather than
+speed. Text generation reads the language model's active experts per token and
+never touches the vision tower, so tok/s would be unchanged. The 1.14 GB is worth
+perhaps 9,000 extra tokens of KV cache at 8 bits, which is not much against a
+260k context.
+
+The risk is worse than the gain. Removing `vision_config` changes which loader
+vllm-mlx selects, and these paths differ in ways the config does not advertise.
+The current one reports `MLLMBatchGenerator: KV prefix cache enabled` and gives
+42 to 51 tok/s. Gemma 4 12B takes a different multimodal path that logs `System
+KV cache SKIP` and runs with no KV cache at all. Trading a working loader for 4%
+of the footprint is a bad deal. If you need the memory, `--cache-memory-mb` and
+KV quantisation act on the part that scales with your workload.
+
+**Why does `--bandwidth` give me a different number every run?**
+
+Because something else is using the memory controller. That is the normal state
+of a working machine, which is why the script reports best, median and worst, and
+derives its verdict from the median. Single readings on the reference machine
+ranged from 175 to 246 GB/s.
+
+**Can I run something bigger, like GLM 5.2?**
+
+Not on 64 GB. GLM 5.2 is 1,507 GB of original weights and still 418 GB as a 4-bit
+MLX conversion, and no Air or Flash variant exists. Active parameter counts are a
+throughput figure, not a memory figure: every expert has to be resident before
+the first token appears, whatever the router ends up selecting.
+
+**Why not a code-tuned model, since some of this work is Python?**
+
+A model tuned to emit code will turn a bad specification into bad code without
+complaint. The bottleneck here is spec quality, so the model needs judgement over
+the domain more than fluency in a language. That is a deliberate trade, and if
+your bottleneck is writing code rather than reviewing specs, pick a different
+model.
+
 ## Layout
 
 | Path | Role |
