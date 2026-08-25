@@ -21,26 +21,38 @@ generates four tokens a second.
 
 Memory bandwidth is what sets your speed. Token generation reads weights from
 memory, so the ceiling for a dense model is roughly `bandwidth / model_size`
-tokens per second. This machine measures 219 GB/s, which would cap a dense 28 GB
-model near 8 tok/s. The model here is sparse, 3.8B parameters active out of
-25.2B, so it reads a fraction of its weight file per token and runs far faster
-than its size suggests. Measure your own bandwidth before assuming these numbers
+tokens per second. Measure yours before assuming any of the numbers here
 transfer:
 
 ```sh
-uvx --from mlx-lm --with mlx python -c "
-import mlx.core as mx, time
-a = mx.zeros((134217728,), dtype=mx.bfloat16); mx.eval(a)
-for _ in range(3): mx.eval(a * 1.0001)
-t = time.perf_counter()
-for _ in range(20): mx.eval(a * 1.0001)
-el = time.perf_counter() - t
-print(f'{20 * a.nbytes * 2 / el / 1e9:.0f} GB/s')"
+./bench.sh --bandwidth      # no server needed, runs in a few seconds
 ```
 
+On the reference machine that reports:
+
+```
+device            : Apple M5 Pro
+memory bandwidth  : 244 best / 234 median / 211 worst GB/s  (5 rounds)
+dense ceiling     : 8.4 tok/s for a 28 GB model  (from median, since the machine will be busy)
+verdict           : workable with a sparse model, not with a dense one
+```
+
+Three numbers, because one is misleading. The best round approximates the
+hardware ceiling. Plan with the median instead: this is a development machine, so
+an editor, a browser, containers and the model itself are all contending for the
+same memory controller, and the loaded figure is what you will actually live
+with. Single samples on this machine came out at 175 and 219 GB/s on hardware
+whose best round is 244.
+
+A dense 28 GB model would therefore cap somewhere under 9 tok/s here, which is
+not usable. The model this repo serves is sparse, with 3.8B parameters active out
+of 25.2B, so it reads a fraction of its weight file per token and measures 42 to
+51 tok/s. That gap, roughly five times the dense ceiling, is the entire reason a
+sparse model is specified.
+
 Below roughly 150 GB/s I would not bother, and a base M-series chip sits in that
-range. I spent a day getting this working on the assumption I had Max-class
-bandwidth. I did not. Measure first.
+range. I spent a day building this on the assumption I had Max-class bandwidth. I
+did not.
 
 ## What it runs
 
