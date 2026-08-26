@@ -64,13 +64,19 @@ fi
 #                    context. Wrong for reasoning over a long spec.
 #   --specprefill    Approximates prefill to cut TTFT. Fine for code output,
 #                    wrong when the task is judging the prompt itself.
-#   --use-paged-cache  Marked experimental; only worth trying if memory-bound.
+# Paged KV cache    Reuses matching prompt blocks instead of only whole cached
+#                   prefixes. It is the important cache mode for an agent that
+#                   resends an expanding conversation, and lets old prefixes
+#                   spill to the SSD tier rather than evicting them outright.
+#                   Set PAGED_CACHE=0 if a particular runtime/model regression
+#                   makes the legacy MLX cache preferable.
 CACHE_MEMORY_MB="${CACHE_MEMORY_MB:-10240}"
 CHUNKED_PREFILL="${CHUNKED_PREFILL:-2048}"
 THINKING_BUDGET="${THINKING_BUDGET:-2048}"
 MAX_NUM_SEQS="${MAX_NUM_SEQS:-4}"
 SSD_CACHE_DIR="${SSD_CACHE_DIR:-$ROOT/.kvcache}"
 SSD_CACHE_MAX_GB="${SSD_CACHE_MAX_GB:-20}"
+PAGED_CACHE="${PAGED_CACHE:-1}"
 
 # --- pre-warming category ----------------------------------------------------
 # Which domain preamble to pre-run at startup, populating the prefix cache.
@@ -144,6 +150,14 @@ TUNING=(
 )
 mkdir -p "$SSD_CACHE_DIR"
 [ -f "$WARM_PROMPTS" ] && TUNING+=(--warm-prompts "$WARM_PROMPTS")
+case "$PAGED_CACHE" in
+  1|true|yes) TUNING+=(--use-paged-cache) ;;
+  0|false|no) echo "paged KV cache: disabled (PAGED_CACHE=$PAGED_CACHE)" ;;
+  *)
+    echo "ERROR: invalid PAGED_CACHE '$PAGED_CACHE' (expected 0/1, false/true, or no/yes)"
+    exit 2
+    ;;
+esac
 
 # Roll the log before appending to it. The launchd agent handles the daily case
 # while the server runs; this covers a machine that was asleep at 00:05.
